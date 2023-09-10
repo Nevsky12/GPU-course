@@ -9,6 +9,12 @@
 #include <utils/sphere.h>
 #include <utils/triangle.h>
 
+template<typename... Ts>
+struct OverloadSet
+{
+    using Ts::operator()...;
+};
+
 int main()
 {
     constexpr unsigned int packSize = 17u;
@@ -137,26 +143,16 @@ int main()
     {
         auto const intersect = [ray](auto const &s) noexcept 
         {
-            return std::visit([&](auto const &obj) noexcept
-                              -> RayRange
-            {
-                using pure = std::decay_t<decltype(obj)>;
-                constexpr bool isAABB   = std::is_same_v<pure, AABB  >;
-                constexpr bool isSphere = std::is_same_v<pure, Sphere>;
-                if constexpr(isAABB)
-                {
-                    return rayAABBIntersection    (ray, obj);
-                }
-                else if constexpr(isSphere)
-                {
-                    return raySphereIntersection  (ray, obj);
-                }
-                else
-                {
-                    f32 const t = rayTriangleIntersection(ray, obj);
-                    return {t, t};
-                }
-            }, s);
+            return std::visit
+            (
+               OverloadSet
+               {
+                  [ray](AABB     const &obj) noexcept {return rayAABBIntersection(ray, obj);},
+                  [ray](Sphere   const &obj) noexcept {return raySphereIntersection(ray, obj);},
+                  [ray](Triangle const &obj) noexcept {return rayTriangleIntersection(ray, obj);},
+               },
+               s
+            );
         };
         auto const intersectionR = geomPack | std::views::transform(intersect);
         auto const bad  = [range](RayRange const r ) noexcept {return empty(r + range);};
@@ -193,19 +189,13 @@ int main()
         vec3 const pos = ray.origin + ray.direction * t;
         vec3 const gPosI = std::visit
         (
-           [&](auto const &obj) noexcept
+           OverloadSet
            {
-                using pure = std::decay_t<decltype(obj)>;
-                constexpr bool isAABB = std::is_same_v<pure, AABB>;
-                constexpr bool isSphere = std::is_same_v<pure, Sphere>;
-                if constexpr(isAABB)
-                    return vec3{0.f, 0.f, -2.f};//vec3{obj.  rMin.x, obj.  rMax.y, obj.  rMax.z};
-                else if constexpr(isSphere)
-                    return vec3{0.f, 0.f, -2.f}; //vec3{obj.origin.x, obj.origin.y, obj.origin.z}; 
-                else
-                    return vec3{0.f, 0.f, -2.f}; // obj.r1    
-           }
-           , geomPack[i]
+              [](AABB     const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
+              [](Sphere   const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
+              [](Triangle const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
+           },
+           geomPack[i]
         );
         vec3 const norm = normalize(pos - gPosI);
         float const NL = std::max(0.f, dot(norm, lightDir));
