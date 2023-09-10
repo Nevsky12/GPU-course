@@ -17,7 +17,6 @@ inline f32 rayTriangleIntersection(Ray const ray, Triangle const triangle) noexc
     vec3 const e2 = r2 - r0;
     
     vec3 const n = cross(e1, e2);
-
     f32 const d0 = dot(-d, n);
 
     f32 const infNeg = -1.0f / 0.f;
@@ -35,7 +34,6 @@ inline f32 rayTriangleIntersection(Ray const ray, Triangle const triangle) noexc
 
     if (b1 < f32(0) || b1      > f32(1))
         return infNeg;
-
     if (b2 < f32(0) || b1 + b2 > f32(1))
         return infNeg;
 
