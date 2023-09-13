@@ -3,7 +3,7 @@ project(utils)
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE .)
-target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID MATCHES "GNU")

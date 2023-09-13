@@ -10,7 +10,7 @@
 #include <utils/triangle.h>
 
 template<typename... Ts>
-struct OverloadSet
+struct OverloadSet: Ts...
 {
     using Ts::operator()...;
 };
@@ -141,37 +141,40 @@ int main()
     auto const closestHit = [geomPack](Ray const ray, RayRange const range) noexcept
         -> std::optional<Hit>
     {
-        auto const intersect = [ray](auto const &s) noexcept 
-        {
-            return std::visit
-            (
-               OverloadSet
+        return std::ranges::fold_left
+        (
+            geomPack | std::views::enumerate              
+                     | std::views::transform([=](auto const &pair) noexcept
                {
-                  [ray](AABB     const &obj) noexcept {return rayAABBIntersection(ray, obj);},
-                  [ray](Sphere   const &obj) noexcept {return raySphereIntersection(ray, obj);},
-                  [ray](Triangle const &obj) noexcept {return rayTriangleIntersection(ray, obj);},
-               },
-               s
-            );
-        };
-        auto const intersectionR = geomPack | std::views::transform(intersect);
-        auto const bad  = [range](RayRange const r ) noexcept {return empty(r + range);};
-        auto const less = [  =  ](RayRange const r1, RayRange const r2) noexcept
-        {
-            if(bad(r1))
-                return false;
-            if(bad(r2))
-                return true;
-            return r1.tMin < r2.tMin;
-        };
-        auto const closestI = std::ranges::min_element(intersectionR, less);
-        if(bad(*closestI))
-            return std::nullopt;
-        return Hit
-        {
-            u32(closestI - std::ranges::begin(intersectionR)),
-            (*closestI).tMin
-        };
+                    auto const &[i, o] = pair;
+                    auto const rsi = std::visit
+                    (
+                        OverloadSet                                                                              
+                        {
+                           [ray](AABB     const &obj) noexcept {return rayAABBIntersection(ray, obj);},
+                           [ray](Sphere   const &obj) noexcept {return raySphereIntersection(ray, obj);},
+                           [ray](Triangle const &obj) noexcept {return rayTriangleIntersection(ray, obj);},
+                        },
+                        o
+                    );
+                    return nonempty(rsi + range)
+                         ? std::optional<Hit>
+                         {{
+                              .objI = u32(i),
+                              .t = contains(range, rsi.tMin) ? rsi.tMin : rsi.tMax
+                         }}
+                         : std::nullopt;
+               }),
+               std::nullopt,
+               [](std::optional<Hit> const &accum, std::optional<Hit> const &hit) noexcept
+               {
+                   if(!accum)
+                       return hit;
+                   if(!hit)
+                       return accum;
+                   return (accum->t < hit->t) ? accum : hit;
+               }
+        );
     };
 
     auto const trace = [&](Ray const ray) noexcept
@@ -187,7 +190,8 @@ int main()
 
         auto const [i, t] = *hit;
         vec3 const pos = ray.origin + ray.direction * t;
-        vec3 const gPosI = std::visit
+        vec3 const gPosI = vec3{0.f, 0.f, -2.f};
+        /*std::visit
         (
            OverloadSet
            {
@@ -196,7 +200,8 @@ int main()
               [](Triangle const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
            },
            geomPack[i]
-        );
+        ); 
+        */
         vec3 const norm = normalize(pos - gPosI);
         float const NL = std::max(0.f, dot(norm, lightDir));
 
