@@ -16,3 +16,5 @@ using f64 = double;
 
 static_assert(sizeof(f32) == 4);
 static_assert(sizeof(f64) == 8);
+
+struct vec2 {f32 x, y;};

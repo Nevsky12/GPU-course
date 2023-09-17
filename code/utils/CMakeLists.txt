@@ -7,5 +7,5 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(${PROJECT_NAME} INTERFACE -Werror -Wall -Wextra -pedantic -Wshadow -Wconversion -Wsign-conversion)
+    target_compile_options(${PROJECT_NAME} INTERFACE -Werror -Wall -Wextra -Wconversion -pedantic -Wshadow -Wsign-conversion)
 endif()

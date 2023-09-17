@@ -8,6 +8,7 @@
 #include <utils/aabb.h>
 #include <utils/sphere.h>
 #include <utils/triangle.h>
+#include <utils/sdTorus.h>
 
 template<typename... Ts>
 struct OverloadSet: Ts...
@@ -17,8 +18,8 @@ struct OverloadSet: Ts...
 
 int main()
 {
-    constexpr unsigned int packSize = 17u;
-    std::variant<AABB, Sphere, Triangle> const geomPack[packSize] =
+    constexpr unsigned int packSize = 18u;
+    std::variant<AABB, Sphere, Triangle, TorusXZ> const geomPack[packSize] =
     {         
         AABB
         {
@@ -104,6 +105,18 @@ int main()
             .r1 = {-0.3f, 0.4f, -4.0f},
             .r2 = { 0.0f, 0.7f, -4.3f},
         },
+        TorusXZ
+        {
+            .O = {5.f, 5.f, 4.f},
+            .r = 0.7f,
+            .R = 2.0f,
+        },
+        TorusXZ
+        {
+            .O = {-5.f, 5.f, 4.f},
+            .r = 0.7f,
+            .R = 2.0f,
+        },
     };
     
     vec3 const gatesWall   = {0.1f, 0.1f, 0.1f};
@@ -112,6 +125,7 @@ int main()
     vec3 const trainArmour = {0.2f, 0.2f, 0.3f};
     vec3 const railway     = {0.2f, 0.1f, 0.1f};
     vec3 const ground      = {0.2f, 0.5f, 0.2f};
+    vec3 const barebuh     = ground;
     vec3 const albedo[packSize] =
     {
         train,
@@ -131,6 +145,8 @@ int main()
         trainArmour,
         trainArmour,
         trainArmour,
+        barebuh,
+        barebuh,
     };
 
     struct Hit
@@ -154,6 +170,7 @@ int main()
                            [ray](AABB     const &obj) noexcept {return rayAABBIntersection(ray, obj);},
                            [ray](Sphere   const &obj) noexcept {return raySphereIntersection(ray, obj);},
                            [ray](Triangle const &obj) noexcept {return rayTriangleIntersection(ray, obj);},
+                           [ray](TorusXZ  const &obj) noexcept {return raySdTorusIntersection(ray, obj);},
                         },
                         o
                     );
