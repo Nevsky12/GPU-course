@@ -29,7 +29,7 @@ inline RayRange raySdTorusIntersection( Ray     const ray
        {
            f32 const latest = sdTorus(p, torus);
            dist += latest;
-		   return (latest > 1e-4f && dist < tMax)
+		   return (latest > 1e-3f && dist < tMax)
 		       ? self(self, O + d * dist)
 		       : dist;
        };

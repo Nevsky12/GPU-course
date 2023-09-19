@@ -250,7 +250,7 @@ int main()
         //vec3 const norm = normalize(pos - gPosI);
         float const NL = std::max(0.f, dot(norm, lightDir));
 
-        auto const shadowHit = closestHit({pos, lightDir}, {1e-3f, 1.f / 0.f});
+        auto const shadowHit = closestHit({pos, lightDir}, {1e-2f, 1.f / 0.f});
         return albedo[i] * (skyColor * 0.1f + lightColor * NL * (shadowHit ? 0.01f : 0.6f));
     };
 
