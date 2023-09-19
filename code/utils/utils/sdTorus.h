@@ -39,7 +39,7 @@ inline RayRange raySdTorusIntersection( Ray     const ray
    f32 const t = raymarch(O);
    f32 const res = t < tMax
                  ? t
-                 : -1.f;
+                 : -1.f / 0.f;
 
    return {res, res};
 }
