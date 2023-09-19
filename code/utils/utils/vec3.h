@@ -96,3 +96,12 @@ inline vec3 cross(vec3 const v1, vec3 const v2) noexcept
         .z = v1.x * v2.y - v1.y * v2.x,
     };
 }
+inline vec3 abs(vec3 const v) noexcept
+{
+    return 
+    {
+        .x = std::abs(v.x),
+        .y = std::abs(v.y),
+        .z = std::abs(v.z),
+    };
+}

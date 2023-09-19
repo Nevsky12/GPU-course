@@ -167,10 +167,10 @@ int main()
                     (
                         OverloadSet                                                                              
                         {
-                           [ray](AABB     const &obj) noexcept {return rayAABBIntersection(ray, obj);},
-                           [ray](Sphere   const &obj) noexcept {return raySphereIntersection(ray, obj);},
-                           [ray](Triangle const &obj) noexcept {return rayTriangleIntersection(ray, obj);},
-                           [ray](TorusXZ  const &obj) noexcept {return raySdTorusIntersection(ray, obj);},
+                           [ray       ](AABB     const &obj) noexcept {return rayAABBIntersection(ray, obj);},
+                           [ray       ](Sphere   const &obj) noexcept {return raySphereIntersection(ray, obj);},
+                           [ray       ](Triangle const &obj) noexcept {return rayTriangleIntersection(ray, obj);},
+                           [ray, range](TorusXZ  const &obj) noexcept {return raySdTorusIntersection(ray, obj, range);},
                         },
                         o
                     );
@@ -199,7 +199,7 @@ int main()
     {
         vec3 const   skyColor = {0.53f, 0.81f, 0.92f};
         vec3 const lightColor = {1.00f, 0.98f, 0.88f};
-        vec3 const lightDir   = normalize({5.f, 3.f, -10.f});
+        vec3 const lightDir   = normalize({-3.f, 5.f, -5.f});
 
         auto const hit = closestHit(ray, zeroToInf);
         if(!hit)
@@ -207,19 +207,47 @@ int main()
 
         auto const [i, t] = *hit;
         vec3 const pos = ray.origin + ray.direction * t;
-        vec3 const gPosI = vec3{0.f, 0.f, -2.f};
-        /*std::visit
+        vec3 const norm =
+        std::visit
         (
            OverloadSet
            {
-              [](AABB     const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
-              [](Sphere   const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
-              [](Triangle const &obj) noexcept {return vec3{0.f, 0.f, -2.f};},
+              [&](AABB     const &obj) noexcept 
+              {
+                    auto const &[rMin, rMax] = obj;
+                    vec3 const C = (rMin + rMax) / 2;
+                    vec3 const d = (rMax - rMin) / 2;
+                    vec3 const PC = pos - C;
+                    f32 const bias = 1.000001f;
+                    vec3 const mod = PC / abs(d) * bias;
+                    return normalize
+                    ({
+                          f32(u32(mod.x)),
+                          f32(u32(mod.y)),
+                          f32(u32(mod.z)),
+                    });
+              },
+              [&](Sphere   const &obj) noexcept {return normalize(pos - obj.origin);},
+              [&](Triangle const &obj) noexcept 
+              {
+                  auto const &[r0, r1, r2] = obj;
+                  return normalize(cross(r1 - r0, r2 - r0));
+              },
+              [&](TorusXZ const &obj) noexcept
+              {
+                  f32 const prec = 1e-4f;
+                  return normalize
+                  ({
+                        sdTorus(pos + vec3{prec, 0.f, 0.f}, obj) - sdTorus(pos - vec3{prec, 0.f, 0.f}, obj),
+                        sdTorus(pos + vec3{0.f, prec, 0.f}, obj) - sdTorus(pos - vec3{0.f, prec, 0.f}, obj),
+                        sdTorus(pos + vec3{0.f, 0.f, prec}, obj) - sdTorus(pos - vec3{0.f, 0.f, prec}, obj),
+                  });
+              }
            },
            geomPack[i]
         ); 
-        */
-        vec3 const norm = normalize(pos - gPosI);
+        
+        //vec3 const norm = normalize(pos - gPosI);
         float const NL = std::max(0.f, dot(norm, lightDir));
 
         auto const shadowHit = closestHit({pos, lightDir}, {1.f, 1.f / 0.f});

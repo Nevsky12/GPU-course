@@ -16,20 +16,20 @@ inline f32 sdTorus(vec3 const p, TorusXZ const torus) noexcept
 
 inline RayRange raySdTorusIntersection( Ray     const ray
                                       , TorusXZ const torus
+                                      , RayRange const range
                                       ) noexcept
 {
    auto const &[O, d] = ray;
-
-   f32 const maxDist = 100.f;
+   auto const [tMin, tMax] = range;
 
    auto const raymarch = [&](vec3 const pos) noexcept -> f32
    {
-       f32 dist = 0; 
+       f32 dist = tMin; 
        auto const raymarchImpl = [&](auto const self, vec3 const p) noexcept -> f32
        {
            f32 const latest = sdTorus(p, torus);
            dist += latest;
-		   return (latest > 1e-4f && dist < maxDist)
+		   return (latest > 1e-4f && dist < tMax)
 		       ? self(self, O + d * dist)
 		       : dist;
        };
@@ -37,7 +37,7 @@ inline RayRange raySdTorusIntersection( Ray     const ray
    };
 
    f32 const t = raymarch(O);
-   f32 const res = t < maxDist
+   f32 const res = t < tMax
                  ? t
                  : -1.f;
 
