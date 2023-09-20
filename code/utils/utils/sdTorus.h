@@ -22,24 +22,31 @@ inline RayRange raySdTorusIntersection( Ray     const ray
    auto const &[O, d] = ray;
    auto const [tMin, tMax] = range;
 
-   auto const raymarch = [&](vec3 const pos) noexcept -> f32
+   f32 t = tMin;
+   while(t < tMax)
    {
-       f32 dist = tMin; 
-       auto const raymarchImpl = [&](auto const self, vec3 const p) noexcept -> f32
+       f32 const dist = sdTorus(O + d * t, torus);
+       if (dist < 1e-5f)
+           return {t, t};
+       t += dist;
+   }
+   return {0.f, -1.f / 0.f};
+   /*
+   return [&](RayRange const rangeT) noexcept -> RayRange
+   {
+       auto const [tMin, tMax] = rangeT;
+       f32 t = tMin;
+       auto const raymarchImpl = [&](auto const self) noexcept -> RayRange
        {
-           f32 const latest = sdTorus(p, torus);
-           dist += latest;
-		   return (latest > 1e-3f && dist < tMax)
-		       ? self(self, O + d * dist)
-		       : dist;
+           f32 const dist = sdTorus(O + d * t, torus);
+           if (dist < 1e-5f)
+               return RayRange{t, t};
+           t += dist;
+		   return (t < tMax)
+		       ? self(self)
+		       : RayRange{0.f, -1.f / 0.f};
        };
-       return raymarchImpl(raymarchImpl, pos);
-   };
-
-   f32 const t = raymarch(O);
-   f32 const res = t < tMax
-                 ? t
-                 : -1.f / 0.f;
-
-   return {res, res};
+       return raymarchImpl(raymarchImpl);
+   }(range);
+   */
 }
