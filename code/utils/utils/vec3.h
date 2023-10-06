@@ -96,12 +96,29 @@ inline vec3 cross(vec3 const v1, vec3 const v2) noexcept
         .z = v1.x * v2.y - v1.y * v2.x,
     };
 }
-inline vec3 abs(vec3 const v) noexcept
+
+inline vec3 min(vec3 const v1, vec3 const v2) noexcept
 {
-    return 
+    return
     {
-        .x = std::abs(v.x),
-        .y = std::abs(v.y),
-        .z = std::abs(v.z),
+        v1.x < v2.x ? v1.x : v2.x,
+        v1.y < v2.y ? v1.y : v2.y,
+        v1.z < v2.z ? v1.z : v2.z,
     };
+}
+inline vec3 max(vec3 const v1, vec3 const v2) noexcept
+{
+    return
+    {
+        v1.x > v2.x ? v1.x : v2.x,
+        v1.y > v2.y ? v1.y : v2.y,
+        v1.z > v2.z ? v1.z : v2.z,
+    };
+}
+
+inline bool operator==(vec3 const v1, vec3 const v2) noexcept
+{
+    return (v1.x == v2.x)
+        && (v1.y == v2.y)
+        && (v1.z == v2.z);
 }

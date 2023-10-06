@@ -25,3 +25,6 @@ inline RayRange operator+(RayRange const r1, RayRange const r2) noexcept
         r1.tMax < r2.tMax ? r1.tMax : r2.tMax,
     };
 }
+
+// if used as an intersection result:
+inline f32 hitDistance(RayRange const r) noexcept {return r.tMin;}
