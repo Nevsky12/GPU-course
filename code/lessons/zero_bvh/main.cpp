@@ -25,7 +25,28 @@ int main()
         vec3 pos;
         vec3 norm;
     };
-    auto const closestHit = [bvh = createBVH(parseOBJ(in), toBox)](Ray const ray, RayRange const range) noexcept
+    auto const closestHit = 
+    [bvh = createBVH(/*
+            std::vector<Triangle>
+      {
+          {
+              .r0 = {1.f, 2.f, 0.f},
+              .r1 = {0.f, 1.f, 8.f},
+              .r2 = {0.f, 4.f, 1.f},
+          },
+          {
+              .r0 = {0.f, 2.f, 0.f},
+              .r1 = {2.f, 0.f, 0.f},
+              .r2 = {0.f, 0.f, 2.f},
+          },
+          {
+              .r0 = {-4.f, -4.f, 0.f},
+              .r1 = {-4.f, -1.f, 3.f},
+              .r2 = {3.f, 9.f, 2.f},
+          },
+      }*/ parseOBJ(in), toBox)
+    ](Ray const ray, RayRange const range) noexcept
+                            //[bvh = createBVH(parseOBJ(in), toBox)](Ray const ray, RayRange const range) noexcept
         -> std::optional<Hit>
     {
         return rayIntersection(ray, bvh, range).transform
@@ -55,6 +76,7 @@ int main()
             return skyColor;
 
         auto const [pos, norm] = *hit;
+        std::cout << "pos: " << pos.x << ", " << pos.y << ", " << pos.z  << std::endl;
         float const NL = std::max(0.f, dot(norm, lightDir));
 
         auto const shadowHit = closestHit({pos, lightDir}, {2e-4f, 1.f / 0.f});
