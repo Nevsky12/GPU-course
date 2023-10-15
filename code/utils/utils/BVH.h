@@ -37,29 +37,8 @@ auto createBVH(Boxable &&r, F const &toBox) noexcept
     using T = std::ranges::range_value_t<Boxable>;
 
     auto const boxR = r | std::views::transform(toBox);
-    AABB const bigBox = *std::ranges::fold_left_first(boxR, mergeBox);
-    vec3 const diag = bigBox.max - bigBox.min;
-
-    auto const proj =
-    [
-        i =  diag.x > diag.y
-          ? (diag.x > diag.z ? 0u : 2u)
-          : (diag.y > diag.z ? 1u : 2u)
-    ](AABB const &box) noexcept
-    {
-        auto const [A,     B] = box;
-        return      A[i] + B[i];
-    };
-    auto const isomer  = [&](u32 const j) noexcept
-    {
-        return proj(boxR[j]);
-    };
-    auto const fromOrd = [&](u32 const j) noexcept
-    {
-        return boxR[j];
-    };
-
     u32 const leafCount = u32(std::ranges::distance(r));
+
     std::vector<AABB> boxes;
     std::vector<u32 > order(leafCount);
     for(u32 k = 0u; k < leafCount; ++k)
@@ -79,29 +58,52 @@ auto createBVH(Boxable &&r, F const &toBox) noexcept
         u32 const left  = 1u << u32(std::log2(n - 1u));
         u32 const right = left >> 1u;
         u32 const mid = n < left + right
-                      ? n - right
-                      : left;
+                      ? n        - right
+                      :     left;
 
-        auto const ord = order | std::views::drop(b) | std::views::take(n);
-        AABB const lastBigBox = *std::ranges::fold_left_first(ord | std::views::transform(fromOrd), mergeBox);
+        auto const ord = order | std::views::drop(b) 
+                               | std::views::take(n);
+        AABB const lastBigBox = *std::ranges::fold_left_first
+        (
+            ord | std::views::transform([&](u32 const j) noexcept {return boxR[j];})
+            , 
+            mergeBox
+        );
         boxes.push_back(lastBigBox);
-        std::ranges::nth_element(order, std::ranges::begin(order) + mid, {}, isomer);
+        vec3 const diag = lastBigBox.max - lastBigBox.min;
+
+        auto const proj =
+        [
+            i =  diag.x > diag.y
+              ? (diag.x > diag.z ? 0u : 2u)
+              : (diag.y > diag.z ? 1u : 2u)
+            ,
+            &boxR
+        ](u32 const j) noexcept
+        {
+            auto const [A    , B  ] = boxR[j];
+            return      A[i] + B[i];
+        };
+
+        std::ranges::nth_element(ord, std::ranges::begin(ord) + mid, {}, proj);
 
         range.push({b, b + mid});
         range.push({b + mid, e});
     }
 
+    /*
     std::cout << boxes.size() << ", " << 2u * leafCount - 1u << std::endl;
     assert(boxes.size() == 2u * leafCount - 1u);
+    */
 
-    u32 const fullLeft = 1u << u32(std::log2(leafCount - 1u));
+    u32 const fullLeft = 1u << u32(std::log2(leafCount - 1u)); 
     std::ranges::rotate(order, std::ranges::begin(order) + 2u * std::ptrdiff_t(leafCount - fullLeft));
-
+ 
     return BVH<T>
     {
         .boxes = boxes,
         .order = order,
-        .geometry = std::move(r)
+        .geometry = std::move(r),
     };
 }
 
@@ -145,26 +147,28 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
         }
         else
         {
-            auto const iLeft  = rayIntersection(ray, boxes[2u * i + 1u], range);
-            auto const iRight = rayIntersection(ray, boxes[2u * i + 2u], range);
+            u32 const goLeft  = 2u * i + 1u;
+            u32 const goRight = 2u * i + 2u;
+            auto const iLeft  = rayIntersection(ray, boxes[goLeft ], range);
+            auto const iRight = rayIntersection(ray, boxes[goRight], range);
                       
             if( iLeft && !iRight)
-                trail.push(2u * i + 1u);
-            if(!iLeft &&  iRight)
-                trail.push(2u * i + 2u);
+                trail.push(goLeft);
+            if(!iLeft && iRight)
+                trail.push(goRight);
             if( iLeft &&  iRight)
             {
                 auto const [tlMin, tlMax] = *iLeft;
                 auto const [trMin, trMax] = *iRight;
                 if(tlMin < trMin)
                 {
-                    trail.push(2u * i + 2u);
-                    trail.push(2u * i + 1u);
+                    trail.push(goRight);
+                    trail.push(goLeft );
                 }
                 else
                 {
-                    trail.push(2u * i + 1u);
-                    trail.push(2u * i + 2u);
+                    trail.push(goLeft );
+                    trail.push(goRight);
                 }
             }
         }
