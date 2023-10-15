@@ -39,6 +39,7 @@ inline std::optional<RayTriangleIntersection> rayIntersection( const Ray ray
     vec3 const b =  r2 - r0;
     vec3 const c = ray.origin - r0;
     vec3 const d = -ray.direction;
+    
 
     f32 const det0 = dot(d, cross(a, b));
 
