@@ -40,7 +40,6 @@ auto createBVH(Boxable &&r, F const &toBox) noexcept
     AABB const bigBox = *std::ranges::fold_left_first(boxR, mergeBox);
     vec3 const diag = bigBox.max - bigBox.min;
 
-
     auto const proj =
     [
         i =  diag.x > diag.y
@@ -60,43 +59,40 @@ auto createBVH(Boxable &&r, F const &toBox) noexcept
         return boxR[j];
     };
 
-
     u32 const leafCount = u32(std::ranges::distance(r));
     std::vector<AABB> boxes;
     std::vector<u32 > order(leafCount);
     for(u32 k = 0u; k < leafCount; ++k)
         order[k] = k;
 
-
     std::queue<std::pair<u32, u32>> range;
     range.push({0u, leafCount});
 
-
-    for(u32 i = 0u; i + 1u < 2u * leafCount - 1u; ++i)
+    for(u32 i = 0u; i < 2u * leafCount - 1u; ++i)
     {
         auto const [b, e] = range.front();
-        range.pop();
- 
+        range.pop(); 
 
         u32 const n = e - b;
+        std::cout << "n: " << n << std::endl;
+
         u32 const left  = 1u << u32(std::log2(n - 1u));
         u32 const right = left >> 1u;
         u32 const mid = n < left + right
                       ? n - right
                       : left;
 
-//        std::cout << "e, b, n, mid: " << e << ", " << b << ", " << n << ", " << mid << std::endl;
-
-        AABB const lastBigBox = *std::ranges::fold_left_first(order | std::views::drop(b) 
-                                                                    | std::views::take(n)
-                                                                    | std::views::transform(fromOrd), mergeBox);
+        auto const ord = order | std::views::drop(b) | std::views::take(n);
+        AABB const lastBigBox = *std::ranges::fold_left_first(ord | std::views::transform(fromOrd), mergeBox);
         boxes.push_back(lastBigBox);
         std::ranges::nth_element(order, std::ranges::begin(order) + mid, {}, isomer);
-
 
         range.push({b, b + mid});
         range.push({b + mid, e});
     }
+
+    std::cout << boxes.size() << ", " << 2u * leafCount - 1u << std::endl;
+    assert(boxes.size() == 2u * leafCount - 1u);
 
     u32 const fullLeft = 1u << u32(std::log2(leafCount - 1u));
     std::ranges::rotate(order, std::ranges::begin(order) + 2u * std::ptrdiff_t(leafCount - fullLeft));
@@ -131,7 +127,6 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
     {
         u32 const i = trail.top();
         trail.pop();
-
         
         if(i + 1u >= leafCount)
         {
