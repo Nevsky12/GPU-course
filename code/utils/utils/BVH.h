@@ -152,19 +152,25 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
         {
             auto const iLeft  = rayIntersection(ray, boxes[2u * i + 1u], range);
             auto const iRight = rayIntersection(ray, boxes[2u * i + 2u], range);
-                        
-            auto const [tlMin, tlMax] = *iLeft;
-            auto const [trMin, trMax] = *iRight;
-
-            if(tlMin < trMin)
+                      
+            if( iLeft && !iRight)
+                trail.push(2u * i + 1u);
+            if(!iLeft &&  iRight)
+                trail.push(2u * i + 2u);
+            if( iLeft &&  iRight)
             {
+                auto const [tlMin, tlMax] = *iLeft;
+                auto const [trMin, trMax] = *iRight;
+                if(tlMin < trMin)
+                {
                     trail.push(2u * i + 2u);
                     trail.push(2u * i + 1u);
-            }
-            else
-            {
+                }
+                else
+                {
                     trail.push(2u * i + 1u);
                     trail.push(2u * i + 2u);
+                }
             }
         }
     }

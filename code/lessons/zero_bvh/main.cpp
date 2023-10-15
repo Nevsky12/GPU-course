@@ -76,7 +76,7 @@ int main()
             return skyColor;
 
         auto const [pos, norm] = *hit;
-        std::cout << "pos: " << pos.x << ", " << pos.y << ", " << pos.z  << std::endl;
+//        std::cout << "pos: " << pos.x << ", " << pos.y << ", " << pos.z  << std::endl;
         float const NL = std::max(0.f, dot(norm, lightDir));
 
         auto const shadowHit = closestHit({pos, lightDir}, {2e-4f, 1.f / 0.f});
