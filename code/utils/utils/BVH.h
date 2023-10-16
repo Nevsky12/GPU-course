@@ -19,8 +19,7 @@ struct BVH
     u32 leafCount(           ) const noexcept {return u32(geometry.size());}
     T   leaf     (u32 const v) const noexcept
     {
-        u32 const l = v - (leafCount() - 1u);
-        return geometry[order[l]];
+        return geometry[order[v % (leafCount() - 1u)]];
     }
 };
 
@@ -33,11 +32,11 @@ auto createBVH(Boxable &&r, F const &toBox) noexcept
          {toBox(geom)} -> std::convertible_to<AABB>;
      })
 {
-    assert(r.size() != 0u);
     using T = std::ranges::range_value_t<Boxable>;
 
     auto const boxR = r | std::views::transform(toBox);
     u32 const leafCount = u32(std::ranges::distance(r));
+    assert(leafCount != 0u);
 
     std::vector<AABB> boxes;
     std::vector<u32 > order(leafCount);
@@ -85,20 +84,21 @@ auto createBVH(Boxable &&r, F const &toBox) noexcept
             return      A[i] + B[i];
         };
 
-        std::ranges::nth_element(ord, std::ranges::begin(ord) + mid, {}, proj);
+        std::ranges::nth_element(ord, ord.begin() + mid, {}, proj);
 
         range.push({b, b + mid});
         range.push({b + mid, e});
     }
 
+    //std::ranges::copy(boxR, std::back_inserter(boxes));
     /*
     std::cout << boxes.size() << ", " << 2u * leafCount - 1u << std::endl;
     assert(boxes.size() == 2u * leafCount - 1u);
     */
 
     u32 const fullLeft = 1u << u32(std::log2(leafCount - 1u)); 
-    std::ranges::rotate(order, std::ranges::begin(order) + 2u * std::ptrdiff_t(leafCount - fullLeft));
- 
+    std::ranges::rotate(order, order.begin() + 2u * std::ptrdiff_t(leafCount - fullLeft));
+
     return BVH<T>
     {
         .boxes = boxes,
@@ -130,7 +130,7 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
         u32 const i = trail.top();
         trail.pop();
         
-        if(i + 1u >= leafCount)
+        if(i >= leafCount - 1u)
         {
             T const geomLeaf = bvh.leaf(i);
             return rayIntersection(ray, geomLeaf, range).transform
@@ -152,10 +152,6 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
             auto const iLeft  = rayIntersection(ray, boxes[goLeft ], range);
             auto const iRight = rayIntersection(ray, boxes[goRight], range);
                       
-            if( iLeft && !iRight)
-                trail.push(goLeft);
-            if(!iLeft && iRight)
-                trail.push(goRight);
             if( iLeft &&  iRight)
             {
                 auto const [tlMin, tlMax] = *iLeft;
@@ -171,6 +167,10 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
                     trail.push(goRight);
                 }
             }
+            else if(iLeft && !iRight)
+               trail.push(goLeft);
+            else if(!iLeft && iRight)
+               trail.push(goRight);
         }
     }
     return std::nullopt;
