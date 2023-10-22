@@ -2,115 +2,94 @@
 #include <algorithm>
 #include <cassert>
 #include <queue>
-#include <memory>
+#include <stack>
 #include <ranges>
-#include <variant>
 #include <vector>
 #include "aabb.h"
-#include <iostream>
-#include <stack>
 
 template<typename T>
 struct BVH
 {
     std::vector<AABB> boxes;
-    std::vector<u32>  order;
-    std::vector<T>    geometry;
+    std::vector<u32 > order;
+    std::vector<T   > geometry;
 
-    u32 leafCount() const noexcept {return u32(geometry.size());}
+    u32 leafCount(           ) const noexcept {return u32(geometry.size());}
+    T   leaf     (u32 const v) const noexcept
+    {
+        u32 const l = v - (leafCount() - 1u);
+        return geometry[order[l]];
+    }
 };
 
-template<typename T>
-T leaf(BVH<T> const &bvh, u32 const vertex) noexcept
-{
-    //std::cout << "vertexI - n + 1: " << vertex << " - " << bvh.leafCount() - 1u << std::endl;
-    u32 const leafI = vertex - (bvh.leafCount() - 1u);
-    std::cout << "leafI: " << leafI << std::endl;
-    std::cout << "order leaf: " << bvh.order[leafI] << std::endl;
-    return bvh.geometry[bvh.order[leafI]];
-}
 
-template<typename T>
-bool isLeaf(BVH<T> const &bvh, u32 const node) noexcept
+template<std::ranges::random_access_range Boxable, typename F>
+auto createBVH(Boxable &&r, F const &toBox) noexcept
+                -> BVH<std::ranges::range_value_t<Boxable>>
+     requires(requires(std::ranges::range_value_t<Boxable> &&geom) 
+     {
+         {toBox(geom)} -> std::convertible_to<AABB>;
+     })
 {
-//    std::cout << "node: " << node << std::endl;
-    return (node >= bvh.leafCount()     - 1u)
-        && (node <  bvh.leafCount() * 2 - 1u); 
-}
-
-using IBox = std::pair<u32, AABB>;
-template<std::ranges::random_access_range Boxable>
-auto createBVHImpl(std::span<IBox> const ibox, Boxable &&r)
-{
-    std::cout << ibox.size() << std::endl;
     using T = std::ranges::range_value_t<Boxable>;
 
-    assert(ibox.size() != 0);
+    auto const boxR = r | std::views::transform(toBox);
+    u32 const leafCount = u32(std::ranges::size(r));
+    assert(leafCount != 0u);
+
+    std::vector<AABB> boxes;
+    std::vector<u32 > order(leafCount);
+    for(u32 k = 0u; k < leafCount; ++k)
+        order[k] = k;
 
     std::queue<std::pair<u32, u32>> range;
-    std::vector<AABB> boxes;
-
-    u32 const leafCount = u32(std::ranges::distance(ibox));
     range.push({0u, leafCount});
 
-    std::vector<u32> order(leafCount);
-    for(u32 k = 0u; k < leafCount; ++k)
-        order[k] = k; 
-
-    for (u32 i = 0u; i + 1u < leafCount; ++i)
+    for(u32 i = 0u; i < 2u * leafCount - 1u; ++i)
     {
         auto const [b, e] = range.front();
-        range.pop();
+        range.pop(); 
 
         u32 const n = e - b;
-        AABB const lastBigBox = *std::ranges::fold_left_first(ibox | std::views::values
-                                                                   | std::views::drop(b)
-                                                                   | std::views::take(n), mergeBox);
-        boxes.push_back(lastBigBox);
 
-        vec3 const diag = lastBigBox.max - lastBigBox.min;
-        auto const proj = 
-        [
-            i = diag.x > diag.y
-                ? (diag.x > diag.z ? 0u : 2u)
-                : (diag.y > diag.z ? 1u : 2u)
-        ](IBox const &box) noexcept
-        {
-            auto const &[A, B] = box.second;
-            return A[i] + B[i];
-        };
-
-        u32 const left = 1u << u32(std::log2(n - 1u));
+        u32 const left  = 1u << u32(std::log2(n - 1u));
         u32 const right = left >> 1u;
         u32 const mid = n < left + right
-                      ? n -        right
+                      ? n        - right
                       :     left;
 
-        auto const ib = ibox | std::views::drop(b)
-                             | std::views::take(n);
-        auto const begin = std::ranges::begin(ib);
-        auto const end   = std::ranges::end  (ib);
-        std::ranges::nth_element(begin, begin + mid, end, {}, proj);
-
-       
         auto const ord = order | std::views::drop(b) 
                                | std::views::take(n);
-        auto const isomer = [&](u32 const j) noexcept  
+        AABB const lastBigBox = *std::ranges::fold_left_first
+        (
+            ord | std::views::transform([&](u32 const j) noexcept {return boxR[j];})
+            , 
+            mergeBox
+        );
+        boxes.push_back(lastBigBox);
+        vec3 const diag = lastBigBox.max - lastBigBox.min;
+
+        auto const proj =
+        [
+            i =  diag.x > diag.y
+              ? (diag.x > diag.z ? 0u : 2u)
+              : (diag.y > diag.z ? 1u : 2u)
+            ,
+            &boxR
+        ](u32 const j) noexcept
         {
-            return proj(ib[j]);
+            auto const [A    , B  ] = boxR[j];
+            return      A[i] + B[i];
         };
-        
-        std::ranges::nth_element(ord, std::ranges::begin(ord) + mid, {}, isomer);
-   
+
+        std::ranges::nth_element(ord, ord.begin() + mid, {}, proj);
+
         range.push({b, b + mid});
         range.push({b + mid, e});
     }
 
-    auto const leafBoxes = ibox | std::views::values;
-    boxes.insert(boxes.end(), leafBoxes.begin(), leafBoxes.end());
-
-    u32 const fullLeft = 1u << u32(std::log2(leafCount - 1u));
-    std::ranges::rotate(order, std::ranges::begin(order) + 2 * std::ptrdiff_t(leafCount - fullLeft));
+    u32 const fullLeft = 1u << u32(std::log2(leafCount - 1u)); 
+    std::ranges::rotate(order, order.begin() + 2u * std::ptrdiff_t(leafCount - fullLeft));
 
     return BVH<T>
     {
@@ -120,101 +99,68 @@ auto createBVHImpl(std::span<IBox> const ibox, Boxable &&r)
     };
 }
 
-template<std::ranges::random_access_range Boxable, typename F>
-auto createBVH(Boxable &&r, F const &toBox)
-    requires(requires(std::ranges::range_value_t<Boxable> const geom)
-    {
-        {toBox(geom)} -> std::convertible_to<AABB>;
-    })
-{
-    auto const boxER = r | std::views::enumerate
-                         | std::views::transform
-        (
-            [toBox](auto const &pair) noexcept
-                -> IBox
-            {
-                auto const &[i, obj] = pair;
-                return {u32(i), toBox(obj)};
-            }
-        );
-    std::vector<IBox> box = {std::ranges::begin(boxER), std::ranges::end(boxER)};
-    return createBVHImpl(box, std::forward<Boxable>(r));
-}
-
-template<typename A, typename B>
-f32 hitDistance(std::pair<A const *, B> const &intersection) noexcept
+template<typename T, typename I>
+f32 hitDistance(std::pair<T const, I> const &intersection) 
 {
     return hitDistance(intersection.second);
 }
 
+
 template<typename T>
 auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noexcept
-    -> std::optional
-    <
+     -> std::optional
+     <
         std::pair
         <
             T,
             typename decltype(rayIntersection(ray, std::declval<T>(), range))::value_type
         >
-    >
+     >
 {
+    using R = decltype(rayIntersection(ray, bvh, range));
+
     auto const &boxes = bvh.boxes;
+    u32 const leafCount = bvh.leafCount();
 
     std::stack<u32> trail;
-    trail.push(1u);
+    trail.push(0u);
+
+    R res = std::nullopt;
+    f32 tMax = range.tMax;
 
     while(!trail.empty())
     {
         u32 const i = trail.top();
         trail.pop();
-
-        if (!isLeaf(bvh, i - 1u))
+        
+        if(i >= leafCount - 1u)
         {
-            auto const iLeft  = rayIntersection(ray, boxes[2u * i - 1u], range);
-            auto const iRight = rayIntersection(ray, boxes[2u * i     ], range);
-  
-            if(iLeft && iRight)
+            T const geomLeaf = bvh.leaf(i);
+            auto const hit = rayIntersection(ray, geomLeaf, {range.tMin, tMax});
+            if(hit)
             {
-               f32 const tLeft  = hitDistance(*iLeft);
-               f32 const tRight = hitDistance(*iRight);
-               if(tLeft < tRight)
-               {
-                   trail.push(2u * i);
-                   trail.push(2u * i + 1u);
-               }
-               else
-               {
-                   trail.push(2u * i + 1u);
-                   trail.push(2u * i);
-               }
+                f32 const t = hitDistance(*hit);
+                if(t < tMax)
+                {
+                    tMax = t;
+                    res = {geomLeaf, *hit};
+                }
             }
-            else if(iLeft && !iRight)
-                trail.push(2u * i);
-            else if(!iLeft && iRight)
-                trail.push(2u * i + 1u);
         }
         else
         {
-            T const geometryLeaf = leaf(bvh, i - 1u);
-            auto const [r0, r1, r2] = geometryLeaf;
-            std::cout << "range: " << range.tMin << ", " << range.tMax << std::endl;
-            std::cout << "x: " << r0.x << ", " << r1.x << ", " << r2.x << std::endl;
-            auto const res = rayIntersection(ray, geometryLeaf, range).transform
-            ( 
-                [&]<typename I>(I const &intersection) noexcept
-                {
-                    return std::pair<T, I>
-                    {
-                        geometryLeaf,
-                        intersection
-                    };
-                }
-            );
-            std::cout << "yes inter: " << res.has_value() << std::endl;
-            return res;
+            u32 const goLeft  = 2u * i + 1u;
+            u32 const goRight = 2u * i + 2u;
+            auto const iLeft  = rayIntersection(ray, boxes[goLeft ], range);
+            auto const iRight = rayIntersection(ray, boxes[goRight], range);
+
+            if(iLeft  && hitDistance(*iLeft)  < tMax)
+                trail.push(2u * i + 1u);
+            if(iRight && hitDistance(*iRight) < tMax)
+                trail.push(2u * i + 2u);              
         }
     }
-    return std::nullopt;
+    return res;
 }
 
 

@@ -43,18 +43,18 @@ inline std::optional<RayTriangleIntersection> rayIntersection( const Ray ray
 
     f32 const det0 = dot(d, cross(a, b));
 
-    std::cout << "det0: " << det0 << std::endl;
+//    std::cout << "det0: " << det0 << std::endl;
 
-    auto const [Dir, orig] = ray;
-    std::cout << "ray (orig, dir): " << " (" << orig.x << ", " << orig.y << ", " << orig.z << ")"
-                                      << " (" << Dir.x  << ", " << Dir.y  << ", " << Dir.z  << std::endl;
+//    auto const [Dir, orig] = ray;
+//    std::cout << "ray (orig, dir): " << " (" << orig.x << ", " << orig.y << ", " << orig.z << ")"
+//                                      << " (" << Dir.x  << ", " << Dir.y  << ", " << Dir.z  << std::endl;
                                      
 
     f32 const t = dot(c, cross(a, b)) / det0;
     f32 const p = dot(d, cross(c, b)) / det0;
     f32 const q = dot(d, cross(a, c)) / det0;
 
-    std::cout << "p, q: " << p << ", " << q << std::endl; 
+//    std::cout << "p, q: " << p << ", " << q << std::endl; 
     return contains(range, t)
         && (1.f - p - q) >= 0.f
         &&        p      >= 0.f
