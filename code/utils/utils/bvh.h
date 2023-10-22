@@ -105,6 +105,7 @@ f32 hitDistance(std::pair<T const, I> const &intersection)
     return hitDistance(intersection.second);
 }
 
+#ifdef STACKFULL
 
 template<typename T>
 auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noexcept
@@ -163,8 +164,8 @@ auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noe
     return res;
 }
 
+#else
 
-/*
 struct TraverseState
 {
     u32 count;
@@ -201,23 +202,79 @@ TraverseState up(TraverseState const state) noexcept
     };
 }
 
-TraverseState down(TraverseState const state, bool const goLeft) noexcept
+TraverseState proceed(TraverseState const state, bool const goLeft, bool const goRight) noexcept
 {
-    u32 const node = goLeft
-              ? state.node * 2u
-              : state.node * 2u + 1u;
-    return
+    if (state.node < state.count)
     {
-        .count = state.count,
-        .node  = node,
-        .trail = state.trail * 2u,
-    };
+        if(goLeft || goRight)
+        {
+            u32 const next = goLeft
+                      ? 2u * state.node
+                      : 2u * state.node + 1u;
+            return 
+            {
+                .count = state.count,
+                .node  = next,
+                .trail = 2u * state.trail + (goLeft xor goRight ? 1u : 0u),
+            };
+        }
+    }
+    return up(state);
 }
 
-TraverseState proceed(TraverseState const state, bool const control) noexcept
+
+template<typename T>
+auto rayIntersection(Ray const ray, BVH<T> const &bvh, RayRange const range) noexcept
+     -> std::optional
+     <
+        std::pair
+        <
+            T,
+            typename decltype(rayIntersection(ray, std::declval<T>(), range))::value_type
+        >
+     >
 {
-    return state.node < state.count
-         ? down(state, control)
-         : up  (state);
+    using R = decltype(rayIntersection(ray, bvh, range));
+
+    auto const &boxes = bvh.boxes;
+    u32 const leafCount = bvh.leafCount();
+
+    TraverseState state = initializeTraverse(leafCount);
+    
+    R res = std::nullopt;
+    f32 tMax = range.tMax;
+
+    while(incomplete(state))
+    {   
+        u32 const i = state.node - 1u;
+        if(i >= leafCount + 1u)
+        {
+            T const geomLeaf = bvh.leaf(i);
+            auto const hit = rayIntersection(ray, geomLeaf, {range.tMin, tMax});
+            if(hit)
+            {
+                f32 const t = hitDistance(*hit);
+                if(t < tMax)
+                {
+                    tMax = t;
+                    res = {geomLeaf, *hit};
+                }
+            }
+            state = up(state);
+        }
+        else
+        {
+            u32 const left  = 2u * i + 1u;
+            u32 const right = 2u * i + 2u;
+            auto const iLeft  = rayIntersection(ray, boxes[left ], range);
+            auto const iRight = rayIntersection(ray, boxes[right], range);
+
+            bool const goLeft   = iLeft && hitDistance(*iLeft) < tMax;
+            bool const goRight = iRight && hitDistance(*iRight) < tMax;
+            state = proceed(state, goLeft, goRight);
+        }
+    }
+    return res;
 }
-*/
+
+#endif

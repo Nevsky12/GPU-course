@@ -3,7 +3,7 @@
 #include <numeric>
 #include <ranges>
 
-#include <utils/BVH.h>
+#include <utils/bvh.h>
 #include <utils/camera.h>
 #include <utils/triangle.h>
 #include <utils/wfobj.h>
