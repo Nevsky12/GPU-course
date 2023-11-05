@@ -122,9 +122,11 @@ int main()
 
 
 
-    auto const closestHit = [&, intersect = intersectTLAS(tlas, blas)](Ray const ray) noexcept
+    auto const closestHit = [&, intersect = intersectTLAS(tlas, blas)]( Ray const ray
+                                                                      , RayDistanceRange const range = {1e-4f, 1.f / 0.f}
+                                                                      ) noexcept
     {
-        return intersect(ray).transform
+        return intersect(ray, range).transform
         (
             [&](RayTLASIntersection const hit) noexcept
             {
@@ -173,30 +175,15 @@ int main()
         auto const sample = [&](u32) noexcept
         {
             auto const [pos, norm, albedo, emission] = *hit;
-            auto const [dir, pdf] = sourcesSampler(pos);
+            auto const [dir, pdf] = sourcesSampler(pos, norm);
 
-            auto const     secondaryHit = closestHit({offsetPoint(pos, norm), dir}); 
+            auto const     secondaryHit = closestHit({pos, dir}); 
             vec3 const L = secondaryHit ? secondaryHit->emission : skyL;
-            
-
-            /*
-            auto const [eye, d] = ray;
-            f32 pdfC = pdf;
-            if (secondaryHit)
-            {
-                auto const [pos1, norm1, u1, u2] = *secondaryHit;
-                f32 const drfi2 = dot(pos1 - o, pos1 - eye);
-                pdfC *= dot(norm,  pos1 - eye )
-                      * dot(norm1, eye  - pos1)
-                      / drfi2 / drfi2;
-            }
-            */
-            
-
+           
             return L * (albedo / std::numbers::pi_v<f32>) / pdf;
         };
 
-        u32 const N = 16u;
+        u32 const N = 1024u;
         auto const sum = *std::ranges::fold_left_first(std::views::iota(0u, N) | std::views::transform(sample), lambdaE2(x, y, x + y));
         return hit->emission + sum / f32(N);
     };
