@@ -1,0 +1,27 @@
+stages:
+    - build
+    - test
+
+build:
+  stage: build
+  image: gcc
+  before_script:
+    - apt update --yes
+    - apt install cmake --yes
+    - git submodule update --init
+  script:
+    - mkdir ./test/build
+    - cd ./test/build
+    - cmake .. -DCMAKE_BUILD_TYPE=Debug
+    - make -j
+  artifacts:
+    paths:
+      - ./test/build/test
+
+test:
+  stage: test
+  dependencies:
+    - build
+  script:
+    - cd test/build
+    - ./test
