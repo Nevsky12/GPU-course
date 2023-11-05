@@ -17,9 +17,9 @@ struct PyramidSample
 };
 
 
-f32 pyramidSolidAngle( vec3 const pos
-                     , Triangle const &tr
-                     ) noexcept
+f32 pyramidVolume( vec3 const pos
+                 , Triangle const &tr
+                 ) noexcept
 {
     auto const [r0, r1, r2] = tr;
 /*
@@ -74,23 +74,26 @@ auto sourcesSamplerFrom(std::vector<EmissiveTriangleInfo> const &sources) noexce
         Triangle const &trI = sources[I].pos;
         auto const [p, pdfI] = f(trI);
         
-        /*
-        f32 pdfFS = muI * pdfI;
-        for(unsigned i = 1u; i < sources.size(); ++i)
+        f32 pdfFS = 0.f;
+        for(unsigned i = 0u; i < sources.size(); ++i)
         {
-            auto const [J,  muJ] = indexSampler();
-            Triangle const &trJ = sources[J].pos;
-            auto const [_, pdfJ] = f(trJ);
-            pdfFS += muJ * pdfJ;
+            u32 k = u32(sources.size());
+            f32 muJ = 0.f;
+            do
+            {
+               auto const [m, muM] = indexSampler();
+               k = m;
+               muJ = muM;
+            }
+            while(k != i);
+            Triangle const &trJ = sources[k].pos;
+            pdfFS += muJ / pyramidVolume(p0, trJ);
         }
-        */
-
-
         
         return PyramidSample
         {
             .dr = p - p0,
-            .pdf = 1.f / pyramidSolidAngle(p0, trI),
+            .pdf = pdfFS, 
         };
     };
 }
