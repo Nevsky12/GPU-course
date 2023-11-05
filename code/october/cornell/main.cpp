@@ -19,7 +19,7 @@
 
 int main()
 {
-    gltf::GLTF const gltf(std::ifstream("../cornell.glb", std::ios::binary));
+    gltf::GLTF const gltf(std::ifstream("../cornell1.glb", std::ios::binary));
 
     /* dump json:
     for(gltf::u8 const u : gltf.binary.chunk[0].data)
@@ -163,7 +163,7 @@ int main()
     };
 
 
-    auto const sourcesSampler = sourcesSamplerFrom(emissiveTriangleInfo);
+    auto const sourcesSampler = sourcesSamplerFrom(emissiveTriangleInfo, uniformTrianglePoint, triangleWeight);
     auto const trace = [&](Ray const ray) noexcept
     {
         vec3 const skyL = vec3(0.f);

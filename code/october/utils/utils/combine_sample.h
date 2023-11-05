@@ -16,21 +16,37 @@ struct SourceSample
     f32 pdf;
 };
 
-auto sourcesSamplerFrom(std::vector<EmissiveTriangleInfo> const &sources) noexcept
+f32 triangleWeight(EmissiveTriangleInfo const &info) noexcept
+{
+    auto const [r0, r1, r2] = info.pos;
+    return 0.5f * length(cross(r2 - r0, r1 - r0)) * length(info.emission);
+}
+
+template<std::ranges::range R, typename DF, typename Weighter>
+requires( requires( std::ranges::range_value_t<R> const r
+                  , Weighter const wr
+                  , DF const df
+                  ) 
+              {
+                  {r.pos} -> std::convertible_to<vec3>;
+                  {wr(r)} -> std::convertible_to<f32>;
+                  {df(r.pos, vec3{}, vec3{})};
+              }
+        )
+auto sourcesSamplerFrom(R const &sources, DF const &df, Weighter const &wr) noexcept
 {
     return 
     [
         indexSampler = indexSamplerFrom( sources 
                                        | std::views::transform
                                        (
-                                           [](EmissiveTriangleInfo const &info) noexcept 
+                                           [&](std::ranges::range_value_t<R> const &info) noexcept 
                                            {
-                                               auto const [r0, r1, r2] = info.pos;
-                                               return 0.5f * length(cross(r2 - r0, r1 - r0)) * length(info.emission);
+                                               return wr(info);
                                            })
                                        ),
         &sources     = sources,
-        &f = uniformTrianglePoint
+        &df = df
         ](vec3 const pos, vec3 const norm) noexcept
     {
         /*     
@@ -50,10 +66,9 @@ auto sourcesSamplerFrom(std::vector<EmissiveTriangleInfo> const &sources) noexce
             pdfFS += muJ * uniformTrianglePoint(trJ, pos, norm).pdf;
         }
         */
-        
-        
+                
         auto const  [I,  muI] = indexSampler();
-        auto const &[r, pdf] = uniformTrianglePoint(sources[I].pos, pos, norm);
+        auto const &[r, pdf] = df(sources[I].pos, pos, norm);
         return SourceSample
         {
             .dr = r - pos,

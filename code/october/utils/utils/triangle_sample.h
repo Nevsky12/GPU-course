@@ -24,7 +24,7 @@ inline TriangleSample uniformTrianglePoint( Triangle const &triangle
                             + p      * r1
                                 + q  * r2;
         vec3 const dr = r - o;
-        f32 const A = 1.f / 2.f * std::abs(dot(dr, cross(r1 - r0, r2 - r0)));
+        f32 const A = 1.f / 6.f * std::abs(dot(dr, cross(r1 - r0, r2 - r0)));
         f32 const Nproj = std::abs(dot(N, dr));
         return 
         {
