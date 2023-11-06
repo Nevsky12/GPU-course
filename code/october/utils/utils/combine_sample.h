@@ -13,13 +13,14 @@ struct EmissiveTriangleInfo
 struct SourceSample
 {
     vec3 dr;
+    vec3 n;
     f32 pdf;
 };
 
 f32 triangleWeight(EmissiveTriangleInfo const &info) noexcept
 {
     auto const [r0, r1, r2] = info.pos;
-    return 0.5f * length(cross(r2 - r0, r1 - r0)) * length(info.emission);
+    return length(cross(r2 - r0, r1 - r0)) * length(info.emission);
 }
 
 template<std::ranges::range R, typename DF, typename Weighter>
@@ -30,7 +31,7 @@ requires( requires( std::ranges::range_value_t<R> const r
               {
                   {r.pos} -> std::convertible_to<vec3>;
                   {wr(r)} -> std::convertible_to<f32>;
-                  {df(r.pos, vec3{}, vec3{})};
+                  {df(r.pos)};
               }
         )
 auto sourcesSamplerFrom(R const &sources, DF const &df, Weighter const &wr) noexcept
@@ -47,31 +48,14 @@ auto sourcesSamplerFrom(R const &sources, DF const &df, Weighter const &wr) noex
                                        ),
         &sources     = sources,
         &df = df
-        ](vec3 const pos, vec3 const norm) noexcept
-    {
-        /*     
-        f32 pdfFS = 0.f;
-        for(unsigned i = 0u; i < sources.size(); ++i)
-        {
-            u32 k = u32(sources.size());
-            f32 muJ = 0.f;
-            do
-            {
-               auto const [m, muM] = indexSampler();
-               k = m;
-               muJ = muM;
-            }
-            while(k != i);
-            Triangle const &trJ = sources[k].pos;
-            pdfFS += muJ * uniformTrianglePoint(trJ, pos, norm).pdf;
-        }
-        */
-                
+        ](vec3 const pos) noexcept
+    { 
         auto const  [I,  muI] = indexSampler();
-        auto const &[r, pdf] = df(sources[I].pos, pos, norm);
+        auto const &[r, n, pdf] = df(sources[I].pos);
         return SourceSample
         {
             .dr = r - pos,
+            .n = n,
             .pdf = pdf * muI, 
         };
     };

@@ -5,15 +5,11 @@
 struct TriangleSample
 {
     vec3 r;
+    vec3 n;
     f32 pdf;
 };
-inline TriangleSample uniformTrianglePoint( Triangle const &triangle
-                                          , vec3 const rayOrigin
-                                          , vec3 const rayOriginNorm
-                                          ) noexcept
+inline TriangleSample uniformTrianglePoint(Triangle const &triangle) noexcept
 {
-    vec3 const &o = rayOrigin;
-    vec3 const &N = rayOriginNorm;
     auto const [r0, r1, r2] = triangle;
     for(;;)
     {
@@ -23,14 +19,12 @@ inline TriangleSample uniformTrianglePoint( Triangle const &triangle
         vec3 const r = (1.f - p - q) * r0
                             + p      * r1
                                 + q  * r2;
-        vec3 const dr = r - o;
-        f32 const A = 1.f / 6.f * std::abs(dot(dr, cross(r1 - r0, r2 - r0)));
-        f32 const Nproj = std::abs(dot(N, dr));
+        vec3 const SN = cross(r1 - r0, r2 - r0);
         return 
         {
             .r = r,
-            .pdf =  dot(dr, dr) * dot(dr, dr)
-                 / (      A     * Nproj      )
+            .n = normalize(SN),
+            .pdf = 2.f / length(SN),
         };
     }
 }

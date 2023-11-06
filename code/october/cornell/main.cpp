@@ -175,12 +175,34 @@ int main()
         auto const sample = [&](u32) noexcept
         {
             auto const [pos, norm, albedo, emission] = *hit;
-            auto const [dir, pdf] = sourcesSampler(pos, norm);
+            auto const [dir, n, pdf] = sourcesSampler(pos);
 
-            auto const     secondaryHit = closestHit({pos, dir}); 
+            auto const     secondaryHit = closestHit({pos, normalize(dir)}); 
             vec3 const L = secondaryHit ? secondaryHit->emission : skyL;
-           
-            return L * (albedo / std::numbers::pi_v<f32>) / pdf;
+
+            
+            bool const isOverlap = secondaryHit 
+                                 ? [&]() noexcept -> bool
+                                   {
+                                       auto const [last, norm2, a2, e2] = *secondaryHit;
+                                       vec3 const really = closestHit({offsetPoint(last, norm2), normalize(pos - last)})->pos;
+                                       return dot(really - pos, really - pos) > 1e-8f;
+                                   }  ()
+                                 : false;
+            if(isOverlap)
+               return skyL;
+
+            f32 const mult = secondaryHit 
+                           ? [&]() noexcept -> f32
+                             {
+                                 vec3 const dr = dir; 
+                                 return    dot(dr,    dr) * dot(dr,   dr)
+                                      /
+                                 std::abs( dot(norm,  dr) * dot(n,    dr) );
+                             }()
+                           : 1.f;
+
+            return L * (albedo / std::numbers::pi_v<f32>) / (pdf * mult);
         };
 
         u32 const N = 1024u;
