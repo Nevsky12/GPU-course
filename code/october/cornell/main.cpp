@@ -178,20 +178,8 @@ int main()
             auto const [dir, n, pdf] = sourcesSampler(pos);
 
             auto const     secondaryHit = closestHit({pos, normalize(dir)}); 
-            vec3 const L = secondaryHit ? secondaryHit->emission : skyL;
-
-            
-            bool const isOverlap = secondaryHit 
-                                 ? [&]() noexcept -> bool
-                                   {
-                                       auto const [last, norm2, a2, e2] = *secondaryHit;
-                                       vec3 const really = closestHit({offsetPoint(last, norm2), normalize(pos - last)})->pos;
-                                       return dot(really - pos, really - pos) > 1e-8f;
-                                   }  ()
-                                 : false;
-            if(isOverlap)
-               return skyL;
-
+            vec3 const L = length(secondaryHit->pos - dir - pos) < 1e-4f ? secondaryHit->emission : skyL;
+ 
             f32 const mult = secondaryHit 
                            ? [&]() noexcept -> f32
                              {
