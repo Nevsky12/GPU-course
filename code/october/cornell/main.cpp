@@ -178,7 +178,7 @@ int main()
             auto const [dir, n, pdf] = sourcesSampler(pos);
 
             auto const     secondaryHit = closestHit({pos, normalize(dir)}); 
-            vec3 const L = length(secondaryHit->pos - dir - pos) < 1e-4f ? secondaryHit->emission : skyL;
+            vec3 const L = length(secondaryHit->pos - dir - pos) < 1e-6f ? secondaryHit->emission : skyL;
  
             f32 const mult = secondaryHit 
                            ? [&]() noexcept -> f32
@@ -193,7 +193,7 @@ int main()
             return L * (albedo / std::numbers::pi_v<f32>) / (pdf * mult);
         };
 
-        u32 const N = 1024u;
+        u32 const N = 16u;
         auto const sum = *std::ranges::fold_left_first(std::views::iota(0u, N) | std::views::transform(sample), lambdaE2(x, y, x + y));
         return hit->emission + sum / f32(N);
     };
