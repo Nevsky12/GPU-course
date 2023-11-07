@@ -19,7 +19,7 @@
 
 int main()
 {
-    gltf::GLTF const gltf(std::ifstream("../cornell1.glb", std::ios::binary));
+    gltf::GLTF const gltf(std::ifstream("../cornell1(4).glb", std::ios::binary));
 
     /* dump json:
     for(gltf::u8 const u : gltf.binary.chunk[0].data)
@@ -162,8 +162,20 @@ int main()
         );
     };
 
-
-    auto const sourcesSampler = sourcesSamplerFrom(emissiveTriangleInfo, uniformTrianglePoint, triangleWeight);
+    auto const triangleSourceSampler = 
+               triangleSourceSample
+               (
+                   indexSamplerFrom(emissiveTriangleInfo | std::views::transform
+                       (
+                           [](EmissiveTriangleInfo const &info) noexcept
+                           {
+                               auto const [r0, r1, r2] = info.pos;
+                               return length(cross(r1 - r0, r2 - r0)) * length(info.emission);
+                           }
+                       )                
+                   ),
+                   emissiveTriangleInfo
+               );
     auto const trace = [&](Ray const ray) noexcept
     {
         vec3 const skyL = vec3(0.f);
@@ -174,26 +186,19 @@ int main()
 
         auto const sample = [&](u32) noexcept
         {
-            auto const [pos, norm, albedo, emission] = *hit;
-            auto const [dir, n, pdf] = sourcesSampler(pos);
+            auto const [pos, norm, albedo, emission] = *hit; 
+            auto const [point, pdf] = triangleSourceSampler(pos, norm);
 
-            auto const     secondaryHit = closestHit({pos, normalize(dir)}); 
-            vec3 const L = length(secondaryHit->pos - dir - pos) < 1e-6f ? secondaryHit->emission : skyL;
+            vec3 const wiDir = gltf::normalize(point - pos);
+            auto const secondaryHit = closestHit({pos + 1e-4f * wiDir, wiDir});
+
+            vec3 const real = secondaryHit ? secondaryHit->pos : skyL;
+            vec3 const L = (secondaryHit && dot(real - point, real - point) < 1e-8f) ? secondaryHit->emission : skyL;
  
-            f32 const mult = secondaryHit 
-                           ? [&]() noexcept -> f32
-                             {
-                                 vec3 const dr = dir; 
-                                 return    dot(dr,    dr) * dot(dr,   dr)
-                                      /
-                                 std::abs( dot(norm,  dr) * dot(n,    dr) );
-                             }()
-                           : 1.f;
-
-            return L * (albedo / std::numbers::pi_v<f32>) / (pdf * mult);
+            return L * (albedo / std::numbers::pi_v<f32>) / pdf;
         };
 
-        u32 const N = 16u;
+        u32 const N = 1024u;
         auto const sum = *std::ranges::fold_left_first(std::views::iota(0u, N) | std::views::transform(sample), lambdaE2(x, y, x + y));
         return hit->emission + sum / f32(N);
     };
