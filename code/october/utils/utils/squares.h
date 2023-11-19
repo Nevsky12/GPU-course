@@ -58,10 +58,11 @@ constexpr std::array<f32, N> generate01N() noexcept // -> [0.f, 1.f)^N
 {
     return []<u32... i>(std::integer_sequence<u32, i...>) noexcept
     {
-        static thread_local u64 counter = 0;
+        static thread_local u64 counter = u64(rand());
+        counter += N;
         return std::array
         {
-            uniformFloat(uniformU32(++counter + (i - i)))...
+            uniformFloat(uniformU32(counter + i))...
         };
     }(std::make_integer_sequence<u32, N>{});
 }
