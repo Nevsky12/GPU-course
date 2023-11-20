@@ -3,8 +3,6 @@
 
 #include <gltf/as/top_level.h>
 #include <gltf/as/bottom_level.h>
-
-#include <gltf/utils/offset_point.h>
 #include <gltf/utils/triangle.h>
 
 using namespace gltf::utils;
@@ -20,6 +18,7 @@ struct RayTLASIntersection
     u32 triangleI;
     gltf::utils::RayTriangleIntersection rti;
 };
+inline constexpr RayTLASIntersection noTLASIntersection = {u32(-1), u32(-1), u32(-1), {}};
 
 inline auto intersectBLAS(auto const &blas) noexcept
 {
