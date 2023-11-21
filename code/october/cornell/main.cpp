@@ -34,13 +34,14 @@ int main()
         {
             auto const L = [&](Scene::SurfacePoint const &a, Scene::SurfacePoint const &b) noexcept -> vec3 {return self(a, b, self);};
 
-            auto const lightSample = lightSampler.sample(q1, q2).transform
+            auto const lightSampleContribution = lightSampler.sample(q1, q2).transform
             (
                 [&](Scene::SurfacePointSample const &sample) noexcept
                 {
                     auto const &[q0, pdfLS] = sample;
                     f32 const pdfBSDF = bsdfSampler.pdfW(q0, q1, q2);
-                    return pdfLS / (pdfLS + pdfBSDF) * bsdfSampler.BSDF(q0, q1, q2) * lightSampler.emission(q0, q1) / pdfLS;
+                    f32 const wLS = pdfLS / (pdfLS + pdfBSDF);
+                    return wLS * bsdfSampler.BSDF(q0, q1, q2) * lightSampler.emission(q0, q1) / pdfLS;
                 }
             ).value_or(vec3(0.f));
 
@@ -51,7 +52,8 @@ int main()
                 {
                     auto const &[q0, pdfBSDF] = sample;
                     f32 const pdfLS = lightSampler.pdfW(q0, q1, q2);
-                    return lightSample + pdfBSDF / (pdfBSDF + pdfLS) * bsdfSampler.BSDF(q0, q1, q2) * (lightSampler.emission(q0, q1) + L(q0, q1)) / pdfBSDF;
+                    f32 const wBSDF = pdfBSDF / (pdfBSDF + pdfLS);
+                    return lightSampleContribution + wBSDF * bsdfSampler.BSDF(q0, q1, q2) * (lightSampler.emission(q0, q1) + L(q0, q1)) / pdfBSDF;
                 }
             ).value_or(skyL);
         };
