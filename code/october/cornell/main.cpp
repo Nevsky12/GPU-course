@@ -20,7 +20,7 @@
 #include <mutex>
 int main()
 {
-    Scene const scene(gltf::GLTF(std::ifstream("../cornell1.glb", std::ios::binary)));
+    Scene const scene(gltf::GLTF(std::ifstream("../cornell.glb", std::ios::binary)));
 
     LightSampler const lightSampler(scene);
      BSDFSampler const  bsdfSampler(scene);
@@ -110,7 +110,7 @@ int main()
                         f32 const v =  1.f - 2.f * (generateUniformFloat() + f32(y)) / f32(height);
                         return trace(camera.castRay({u, v}));
                     };
-                    u32 const N = 64u;
+                    u32 const N = 2048u;
                     auto const samples = std::views::iota(0u, N) | std::views::transform(sample);
                     vec3 const c = std::accumulate(std::ranges::begin(samples), std::ranges::end(samples), vec3(0.f)) / f32(N);
                     color[x + y * width] = {c.x, c.y, c.z, 1.f};
