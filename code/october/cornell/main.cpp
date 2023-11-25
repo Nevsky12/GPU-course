@@ -34,28 +34,31 @@ int main()
         {
             auto const L = [&](Scene::SurfacePoint const &a, Scene::SurfacePoint const &b) noexcept -> vec3 {return self(a, b, self);};
 
-            auto const lightSampleContribution = lightSampler.sample(q1, q2).transform
-            (
-                [&](Scene::SurfacePointSample const &sample) noexcept
-                {
-                    auto const &[q0, pdfLS] = sample;
-                    f32 const pdfBSDF = bsdfSampler.pdfW(q0, q1, q2);
-                    f32 const wLS = pdfLS / (pdfLS + pdfBSDF);
-                    return wLS * bsdfSampler.BSDF(q0, q1, q2) * lightSampler.emission(q0, q1) / pdfLS;
-                }
-            ).value_or(vec3(0.f));
+            return // OpenFOAM style
 
-            auto const bsdfSample = bsdfSampler.sample(q1, q2);
-            return bsdfSample.transform
-            (
-                [&](Scene::SurfacePointSample const &sample) noexcept
-                {
-                    auto const &[q0, pdfBSDF] = sample;
-                    f32 const pdfLS = lightSampler.pdfW(q0, q1, q2);
-                    f32 const wBSDF = pdfBSDF / (pdfBSDF + pdfLS);
-                    return lightSampleContribution + wBSDF * bsdfSampler.BSDF(q0, q1, q2) * (lightSampler.emission(q0, q1) + L(q0, q1)) / pdfBSDF;
-                }
-            ).value_or(skyL);
+                lightSampler.sample(q1, q2).transform
+                (
+                    [&](Scene::SurfacePointSample const &sample) noexcept
+                    {
+                        auto const &[q0, pdfLS] = sample;
+                        f32 const pdfBSDF = bsdfSampler.pdfW(q0, q1, q2);
+                        f32 const wLS = pdfLS / (pdfLS + pdfBSDF);
+                        return wLS * bsdfSampler.BSDF(q0, q1, q2) * lightSampler.emission(q0, q1) / pdfLS;
+                    }
+                ).value_or(vec3(0.f))
+
+            +
+
+                bsdfSampler.sample(q1, q2).transform
+                (
+                    [&](Scene::SurfacePointSample const &sample) noexcept
+                    {
+                        auto const &[q0, pdfBSDF] = sample;
+                        f32 const pdfLS = lightSampler.pdfW(q0, q1, q2);
+                        f32 const wBSDF = pdfBSDF / (pdfBSDF + pdfLS);
+                        return wBSDF * bsdfSampler.BSDF(q0, q1, q2) * (lightSampler.emission(q0, q1) + L(q0, q1)) / pdfBSDF;
+                    }
+                ).value_or(skyL);
         };
 
         std::optional<Scene::SurfacePoint> const hit = scene.closestHit(cameraRay);
