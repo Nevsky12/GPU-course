@@ -154,7 +154,7 @@ int main()
     {
         vec3 const   skyColor = {0.53f, 0.81f, 0.92f};
         vec3 const lightColor = {1.00f, 0.98f, 0.88f};
-        vec3 const lightDir   = utils::normalize(vec3{3.f, 3.f, -1.f});
+        vec3 const lightDir   = utils::normalize(vec3{6.f, 3.f, -1.f});
 
         auto const hit = closestHit
         (
@@ -167,11 +167,11 @@ int main()
 
         auto const [i, t] = hit;
         vec3 const pos = ray.pos + ray.dir * t;
-        vec3 const norm = normalize(pos - sphere[i].origin);
+        vec3 const norm = utils::normalize(pos - sphere[i].origin);
         float const NL = std::max(0.f, dot(norm, lightDir));
 
         auto const shadowHit = closestHit({pos, lightDir}, {2e-4f, 1.f / 0.f});
-        return albedo[i] * (skyColor * 0.1f + lightColor * NL * (isMissed(shadowHit.I) ? 0.f : 0.7f));
+        return albedo[i] * (skyColor * 0.1f + lightColor * NL * (!isMissed(shadowHit.I) ? 0.f : 0.7f));
     };
 
     std::ofstream file("out.ppm");

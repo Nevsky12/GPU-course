@@ -83,6 +83,7 @@ inline RayDistanceRange<Float> operator+(RayDistanceRange<Float> const r1, RayDi
         RayDistanceRange<Float> res = r1;
         where(r1.tNear <  r2.tNear, res.tNear) = r2.tNear;
         where(r2.tFar  <= r1.tFar , res.tFar ) = r2.tFar ;
+
         return res;
     }
     else return

@@ -17,4 +17,3 @@ using vec3x4 = utils::gvec<f32x4, 3>;
 using vec4x4 = utils::gvec<f32x4, 4>;
 
 using f32Boolx4 = std::experimental::simd_mask<f32, ABI>;
-
