@@ -15,23 +15,22 @@ class ThreadPool
 public:
 
     ThreadPool(unsigned int const slavesCount) noexcept
+    : stop(false)
     {
-        stopSignal = std::make_shared<std::stop_source>();
-        stopToken  = std::make_shared<std::stop_token >(stopSignal->get_token());
         for(unsigned int i = 0u; i < slavesCount; ++i)
         {
             slaves.emplace_back
             (
-                [this](std::stop_token token) noexcept
+                [this] noexcept
                 {
-                    while(!token.stop_requested())
+                    for(;;)
                     {
                         std::function<void()> task;
                         {
-                            std::unique_lock ulock{mtx};
-                            cond.wait(ulock, [&]{return !taskQueue.empty() || token.stop_requested();});
+                            std::unique_lock ulock(mtx);
+                            cond.wait(ulock, [this]{return !taskQueue.empty() || stop;});
 
-                            if(taskQueue.empty() && token.stop_requested())
+                            if(taskQueue.empty() || stop)
                                return;
 
                             task = std::move(taskQueue.front());   
@@ -39,32 +38,39 @@ public:
                         }
                         task();
                     }
-                },
-                *stopToken
+                }
             );
         }
     }
 
+
     ~ThreadPool()
     {
-        stopSignal->request_stop();
+        {
+            std::unique_lock<std::mutex> ulock(mtx);
+            stop = true;
+        }
+        cond.notify_all();
     }
 
     template<typename F, typename... Args>
-    auto addTaskGetFuture(F &&f, Args&&... args) noexcept 
-         -> std::future<typename std::result_of<F(Args...)>::type>
+    auto addTaskSeeFuture(F &&f, Args&&... args) noexcept 
+         -> std::future<typename std::invoke_result<F, Args...>::type>
     {
-        using resType = std::result_of<F(Args...)>::type;
-        auto task = std::packaged_task<resType()>
+        using resType = std::invoke_result<F, Args...>::type;
+        auto task = std::make_shared<std::packaged_task<resType()>>
         (
             std::bind(static_cast<F &&>(f), static_cast<Args &&>(args)...)
         );
-
-        std::future<resType> res = task.get_future();
+        std::future<resType> res = task->get_future();
 
         {
             std::unique_lock ulock{mtx};
-            taskQueue.emplace([&task]() noexcept {task();});
+
+            taskQueue.emplace
+            (
+                [task] noexcept { (*task)(); }
+            );
         }
 
         cond.notify_one();
@@ -77,27 +83,37 @@ private:
 
     std::vector<std::jthread> slaves;
     std::condition_variable cond;
-    std::shared_ptr<std::stop_source> stopSignal;
-    std::shared_ptr<std::stop_token>  stopToken;
     std::mutex mtx;
+    bool stop;
 };
 
+#define sleepAnd std::this_thread::sleep_for(std::chrono::seconds(1));
 
 int main()
 {
-    unsigned int const threadCount = 7;
-    ThreadPool thrPool(threadCount);
+    ThreadPool pool(12);
 
-    for(unsigned int i = 0u; i < threadCount; ++i)
+    std::vector<std::function<int(int)>> MaryPoppinsBag = 
     {
-        auto res = thrPool.addTaskGetFuture
-                 (
-                     [&i](int a, int b) noexcept { return a + b + i; }, 
-                     7, 
-                     7 * i
-                 );
-        std::cout << "Res: " << res.get() << std::endl;
-    }
+        [](int a) noexcept {sleepAnd return a    ;},
+        [](int b) noexcept {sleepAnd return b + 1;},
+        [](int c) noexcept {sleepAnd return c * 2;},
+    };
+    unsigned int const taskNumber = MaryPoppinsBag.size();
 
-    return 0;
+    std::vector<std::future<int>> results(taskNumber);
+    for(unsigned int i = 0u; i < taskNumber; ++i)
+        results[i] = pool.addTaskSeeFuture(MaryPoppinsBag[i], 1);
+
+
+    std::cout << "Results: " << std::endl;
+    for(unsigned int i = 0u; i < taskNumber; ++i)
+    {
+        std::cout << results[i].get(); 
+        if(i == taskNumber - 1u) 
+           std::cout << "";
+        else
+           std::cout << ", ";
+    }
+    std::cout << std::endl;
 }
