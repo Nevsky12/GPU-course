@@ -9,7 +9,6 @@
 #include <string>
 #include <cstdio>
 
-
 std::queue<int> taskQueue;
 std::vector<std::jthread> threadPool;
 std::mutex mtx;
