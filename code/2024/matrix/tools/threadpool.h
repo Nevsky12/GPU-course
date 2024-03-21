@@ -16,6 +16,7 @@ public:
 
     ThreadPool(unsigned int const slavesCount) noexcept
     : stop(false)
+    , taskCounter(0)
     {
         for(unsigned int i = 0u; i < slavesCount; ++i)
         {
@@ -37,6 +38,12 @@ public:
                             taskQueue.pop();
                         }
                         task();
+                        
+                        {
+                            std::lock_guard<std::mutex> lock(completedTaskMtx);
+                            ++completedTaskCounter;
+                        }
+                        completedTaskCond.notify_one();
                     }
                 }
             );
@@ -71,10 +78,21 @@ public:
             (
                 [task] noexcept { (*task)(); }
             );
+            
+            {
+                std::lock_guard<std::mutex> lock(completedTaskMtx);
+                ++taskCounter;
+            }
         }
 
         cond.notify_one();
         return res;
+    }
+
+    void wait()
+    {
+        std::unique_lock<std::mutex> lock(completedTaskMtx);
+        completedTaskCond.wait(lock, [this] { return taskCounter == completedTaskCounter; });
     }
 
 private:
@@ -85,6 +103,11 @@ private:
     std::condition_variable cond;
     std::mutex mtx;
     bool stop;
+    
+    std::atomic<int> taskCounter;
+    std::mutex completedTaskMtx;
+    std::condition_variable completedTaskCond; 
+    int completedTaskCounter = 0;
 };
 
 
