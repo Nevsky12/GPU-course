@@ -18,6 +18,7 @@ public:
     : stop(false)
     , taskCounter(0)
     {
+        completedTaskCounter = 0;
         for(unsigned int i = 0u; i < slavesCount; ++i)
         {
             slaves.emplace_back
@@ -61,7 +62,7 @@ public:
     }
 
     template<typename F, typename... Args>
-    auto addTaskSeeFuture(F &&f, Args&&... args) noexcept 
+    auto enqueue(F &&f, Args&&... args) noexcept 
          -> std::future<typename std::invoke_result<F, Args...>::type>
     {
         using resType = std::invoke_result<F, Args...>::type;
@@ -107,7 +108,7 @@ private:
     std::atomic<int> taskCounter;
     std::mutex completedTaskMtx;
     std::condition_variable completedTaskCond; 
-    int completedTaskCounter = 0;
+    int completedTaskCounter;
 };
 
 
@@ -144,7 +145,7 @@ std::tuple<std::vector<Ts>...> processTasks( ThreadPool& pool
                     tasks.begin(), 
                     tasks.  end(), 
                     VoF.  begin(),
-                    [&](auto const &task) { return pool.addTaskSeeFuture(std::move(task)); }
+                    [&](auto const &task) { return pool.enqueue(std::move(task)); }
                 ), ...
             );
         }, 
