@@ -3,14 +3,11 @@
 #include "tools/stats.h"
 #include "tools/matrix.h"
 
-//#include <bits/stdc++.h>
-#include <x86intrin.h>
-
 using vf32 = vf32t<8>;
 
 f32 * alloc(std::size_t const n) noexcept
 {
-    f32* ptr = (f32*) std::aligned_alloc(64u, 4u * n);
+    f32 * ptr = (f32*) std::aligned_alloc(64u, 4u * n);
     memset(ptr, 0u, 4u * n); 
     return ptr;
 }
@@ -30,9 +27,9 @@ void kernel( f32  const * const a
     for(std::size_t k = le; k < ri; ++k)
     for(std::size_t i = 0u; i < 6u; ++i)
     {
-        vf32 const alpha = a[ii * N + i * N + k];
+        vf32 const coeff = a[ii * N + i * N + k];
         for(std::size_t j = 0u; j < 2u; ++j)
-            t[i][j] += alpha * b[N / 8u * k + jj / 8u + j];
+            t[i][j] += coeff * b[N / 8u * k + jj / 8u + j];
     }
 
     for(std::size_t i = 0u; i < 6u; ++i)
@@ -80,8 +77,8 @@ void matmul( f32 const * const A
                 kernel
                 (
                     a, 
-                    (vf32 *)b, 
-                    (vf32 *)c, 
+                    reinterpret_cast<vf32 *>(b), 
+                    reinterpret_cast<vf32 *>(c), 
                     
                     ii, 
                     jj, 
@@ -134,14 +131,14 @@ int main()
         std::size_t const N = n;
         for(std::size_t i = 0u; i < M; ++i)
         for(std::size_t j = 0u; j < K; ++j)
-                A[i * M + j] = 1;
+            A[i * M + j] = 1;
         for(std::size_t i = 0u; i < K; ++i)
         for(std::size_t j = 0u; j < N; ++j)
-                B[i * K + j] = 1;
+            B[i * K + j] = 1;
 
         auto const [E, D] = utils::stats<4u>([&] noexcept
         {
-                matmul(A, B, C, n);
+            matmul(A, B, C, n);
         });
    
         //printMatrix(C, M, N);
