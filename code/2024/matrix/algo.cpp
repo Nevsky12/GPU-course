@@ -12,6 +12,12 @@ f32 * alloc(std::size_t const n) noexcept
     return ptr;
 }
 
+
+template
+<
+    std::size_t RegPackSize,
+    std::size_t RegSize
+>
 void kernel( f32  const * const a
            , vf32 const * const b
            , vf32       * const c
@@ -22,45 +28,52 @@ void kernel( f32  const * const a
            , std::size_t const N
            ) noexcept
 {
-    vf32 t[6u][2u] = {0.f};
+    vf32 pack[RegPackSize][2u] = {0.f};
 
-    for(std::size_t k = le; k < ri; ++k)
-    for(std::size_t i = 0u; i < 6u; ++i)
+    for(std::size_t k = le; k < ri         ; ++k)
+    for(std::size_t i = 0u; i < RegPackSize; ++i)
     {
-        vf32 const coeff = a[ii * N + i * N + k];
+        vf32 const ak = a[(ii + i) * N + k];
         for(std::size_t j = 0u; j < 2u; ++j)
-            t[i][j] += coeff * b[N / 8u * k + jj / 8u + j];
+            pack[i][j] += ak * b[(N * k + jj) / RegSize + j];
     }
 
-    for(std::size_t i = 0u; i < 6u; ++i)
-    for(std::size_t j = 0u; j < 2u; ++j)
-        c[ii * N / 8u + i * N / 8u + jj / 8u + j] += t[i][j];
+    for(std::size_t i = 0u; i < RegPackSize; ++i)
+    for(std::size_t j = 0u; j < 2u         ; ++j)
+        c[((ii + i) * N  + jj) / RegSize + j] += pack[i][j];
 }
 
 constexpr std::size_t reserve = 1920u * 1920u; // ~16 MB
 
+template
+<
+    std::size_t ProcessElemNo,
+    std::size_t RegSize = vf32::size(),
+    std::size_t Reg2Size    = RegSize * 2u,
+    std::size_t RegPackSize = ProcessElemNo / Reg2Size
+>
 void matmul( f32 const * const A
            , f32 const * const B
            , f32       * const C
            , std::size_t const N
            ) noexcept
 {
-    std::size_t const Nx = (N +  5u) /  6u *  6u;
-    std::size_t const Ny = (N + 15u) / 16u * 16u;
+    std::size_t const Nx = (N + RegPackSize - 1u) / RegPackSize * RegPackSize;
+    std::size_t const Ny = (N + Reg2Size    - 1u) / Reg2Size    * Reg2Size;
 
     alignas(64u) static f32 a[reserve]
                           , b[reserve]
                           , c[reserve];
     
-    memset(c, 0u, 4u * Nx * Ny);
+    std::memset(c, 0u, sizeof(int) * Nx * Ny);
 
     for(std::size_t i = 0u; i < N; ++i)
     {
-        memcpy(&a[i * Ny], &A[i * N], 4u * N);
-        memcpy(&b[i * Ny], &B[i * N], 4u * N);
+        std::memcpy(&a[i * Ny], &A[i * N], 4u * N);
+        std::memcpy(&b[i * Ny], &B[i * N], 4u * N);
     }
 
-    std::size_t const u = 96u;
+    std::size_t const u = ProcessElemNo;
     std::size_t const s3 = u;
     std::size_t const s2 = 2u * u;
     std::size_t const s1 = 4u * u;
@@ -72,13 +85,13 @@ void matmul( f32 const * const A
     for(std::size_t i1 = 0u; i1 < Ny; i1 += s1)
         pool.enqueue([=] noexcept
         {
-            for(std::size_t ii = i2; ii < std::min(i2 + s2, Nx); ii +=  6u)
-            for(std::size_t jj = i3; jj < std::min(i3 + s3, Ny); jj += 16u)
-                kernel
+            for(std::size_t ii = i2; ii < std::min(i2 + s2, Nx); ii += RegPackSize)
+            for(std::size_t jj = i3; jj < std::min(i3 + s3, Ny); jj += Reg2Size   )
+                kernel<RegPackSize, RegSize>
                 (
                     a, 
-                    reinterpret_cast<vf32 *>(b), 
-                    reinterpret_cast<vf32 *>(c), 
+                    reinterpret_cast<vf32 const * const>(b), 
+                    reinterpret_cast<vf32       * const>(c), 
                     
                     ii, 
                     jj, 
@@ -88,7 +101,7 @@ void matmul( f32 const * const A
                 );
 
             for(std::size_t i = 0u; i < N; ++i)
-                memcpy(&C[i * N], &c[i * Ny], 4u * N);
+                std::memcpy(&C[i * N], &c[i * Ny], 4u * N);
         });
         
     pool.wait();
@@ -107,6 +120,8 @@ void printMatrix( f32 const * const m
         }
         std::cout << std::endl;
     }
+    std::cout << std::endl;
+    std::cout << std::endl;
 }
 
 f32 * emptyMatrix( std::size_t const M
@@ -138,7 +153,7 @@ int main()
 
         auto const [E, D] = utils::stats<4u>([&] noexcept
         {
-            matmul(A, B, C, n);
+            matmul<96u>(A, B, C, n);
         });
    
         //printMatrix(C, M, N);
