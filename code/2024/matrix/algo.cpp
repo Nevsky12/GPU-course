@@ -4,6 +4,7 @@
 #include "tools/matrix.h"
 
 using vf32 = vf32t<8>;
+[[assume(vf32::size() % 2u == 0u)]];
 
 f32 * alloc(std::size_t const n) noexcept
 {
@@ -17,7 +18,7 @@ template
 <
     std::size_t RegPackSize,
     std::size_t RegSize
->
+>   [[using gnu : hot]]
 void kernel( f32  const * const a
            , vf32 const * const b
            , vf32       * const c
@@ -28,12 +29,38 @@ void kernel( f32  const * const a
            , std::size_t const N
            ) noexcept
 {
+    [[assume(a != nullptr)]];
+    [[assume(b != nullptr)]];
+    [[assume(c != nullptr)]];
+    [[assume(N > 0u)]];
+
+    // Process N elements at once
+    // Use 2^K-float regs then:
+    //
+    //      N / 2^K = M x 2,
+    //
+    // M - rows No of registers tile. E.g.:
+    //
+    //             Tile (pack)
+    //
+    // [][][][][][][][] | [][][][][][][][]
+    // -----------------|-----------------
+    // [][][][][][][][] | [][][][][][][][]
+    // -----------------|-----------------
+    // [][][][][][][][] | [][][][][][][][]
+    // -----------------|-----------------
+    // [][][][][][][][] | [][][][][][][][]
+    //                .....
+    // [][][][][][][][] | [][][][][][][][]
+    //
+    
     vf32 pack[RegPackSize][2u] = {0.f};
 
     for(std::size_t k = le; k < ri         ; ++k)
     for(std::size_t i = 0u; i < RegPackSize; ++i)
     {
         vf32 const ak = a[(ii + i) * N + k];
+
         for(std::size_t j = 0u; j < 2u; ++j)
             pack[i][j] += ak * b[(N * k + jj) / RegSize + j];
     }
@@ -48,16 +75,22 @@ constexpr std::size_t reserve = 1920u * 1920u; // ~16 MB
 template
 <
     std::size_t ProcessElemNo,
-    std::size_t RegSize = vf32::size(),
-    std::size_t Reg2Size    = RegSize * 2u,
-    std::size_t RegPackSize = ProcessElemNo / Reg2Size
->
+    std::size_t RegSize = vf32::size()
+>   [[using gnu : hot]]
 void matmul( f32 const * const A
            , f32 const * const B
            , f32       * const C
            , std::size_t const N
            ) noexcept
 {
+    [[assume(A != nullptr)]];
+    [[assume(B != nullptr)]];
+    [[assume(C != nullptr)]];
+    [[assume(N > 0u)]];
+
+    constexpr std::size_t Reg2Size    = RegSize * 2u;
+    constexpr std::size_t RegPackSize = ProcessElemNo / Reg2Size;
+
     std::size_t const Nx = (N + RegPackSize - 1u) / RegPackSize * RegPackSize;
     std::size_t const Ny = (N + Reg2Size    - 1u) / Reg2Size    * Reg2Size;
 
@@ -74,9 +107,9 @@ void matmul( f32 const * const A
     }
 
     std::size_t const u = ProcessElemNo;
-    std::size_t const s3 = u;
-    std::size_t const s2 = 2u * u;
-    std::size_t const s1 = 4u * u;
+    std::size_t const s3 = u;            // Cols No of B
+    std::size_t const s2 = 2u * u;       // Rows No of A
+    std::size_t const s1 = 4u * u;       // Rows No of B
 
     ThreadPool pool(std::thread::hardware_concurrency());
 
@@ -85,8 +118,8 @@ void matmul( f32 const * const A
     for(std::size_t i1 = 0u; i1 < Ny; i1 += s1)
         pool.enqueue([=] noexcept
         {
-            for(std::size_t ii = i2; ii < std::min(i2 + s2, Nx); ii += RegPackSize)
-            for(std::size_t jj = i3; jj < std::min(i3 + s3, Ny); jj += Reg2Size   )
+            for(std::size_t ii = i2; ii < std::min(Nx, i2 + s2); ii += RegPackSize)
+            for(std::size_t jj = i3; jj < std::min(Ny, i3 + s3); jj += Reg2Size   )
                 kernel<RegPackSize, RegSize>
                 (
                     a, 
@@ -101,7 +134,12 @@ void matmul( f32 const * const A
                 );
 
             for(std::size_t i = 0u; i < N; ++i)
-                std::memcpy(&C[i * N], &c[i * Ny], 4u * N);
+                std::memcpy
+                (
+                    &C[i * N ], 
+                    &c[i * Ny], 
+                      4u * N
+                );
         });
         
     pool.wait();
@@ -129,6 +167,9 @@ f32 * emptyMatrix( std::size_t const M
                  , std::size_t const align
                  ) noexcept
 {
+    [[assume(M > 0)]];
+    [[assume(N > 0)]];
+
     f32 * res = static_cast<f32 *>(std::malloc(M * N * sizeof(f32)));
     return res;
 }
