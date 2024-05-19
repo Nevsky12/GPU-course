@@ -44,7 +44,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE imgui ${CMAKE_DL_LIBS})
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR
    CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -pedantic -Wshadow -Wconversion -Wsign-conversion)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -pedantic -Wshadow)
 endif()
 
 option(ASAN     "Use address sanitizer" OFF)

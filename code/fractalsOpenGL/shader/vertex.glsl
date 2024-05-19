@@ -1,14 +1,16 @@
-#version 330 core
-out vec3 pos;
-out vec3 fractalColor;
-out float needColor;
+#version 420 core
+
+layout(location = 0) flat out float time;
+layout(location = 1) flat out vec2  resolution;
+layout(location = 2) flat out vec3  camPos;
+layout(location = 3) flat out vec3  mouse;
+layout(location = 4) flat out float ctgFOV;
+layout(location = 5) out vec2  uv;
 
 uniform float uTime;
 uniform float uAspectRatio;
-uniform int miniPEKKASize; 
-uniform vec3 uMouse;
-
-layout (location = 0) in vec3 aPos;
+uniform vec3  uMouse;
+uniform vec2  uResolution;
 
 mat4 lookAt(vec3 eye, vec3 at, vec3 up)
 {
@@ -36,41 +38,43 @@ void main()
 
     mat4 proj = mat4
     (
-         ctgFOV / uAspectRatio, 0.f, 0.f, 0.f,
-         0.f, ctgFOV, 0.f, 0.f,
-         0.f, 0.f, -C1, -1.f,
-         0.f, 0.f, -C2,  0.f
+         ctgFOV / uAspectRatio, 0.f   , 0.f,  0.f,
+         0.f                  , ctgFOV, 0.f,  0.f,
+         0.f                  , 0.f   , -C1, -1.f,
+         0.f                  , 0.f   , -C2,  0.f
     );
 
     float pi = 3.1415926535f;
     float phi   =        pi * uMouse.x;
     float theta = 0.5f * pi * uMouse.y;
-    vec3 camPos = uMouse.z * vec3
+    vec3 uCamPos = uMouse.z * vec3
     (
         cos(theta) * cos(phi),
         cos(theta) * sin(phi),
         sin(theta)
     );
-    mat4 R = lookAt(camPos, vec3(0.25f), vec3(0.f, 0.f, 1.f));
-   
-    gl_PointSize = 2;
 
-    if(gl_VertexID < miniPEKKASize) // King dream
-    {
-       fractalColor = vec3( 1.f, 0.5f,  1.f);
-       needColor = -1.f;
-    }
-    if(gl_VertexID > miniPEKKASize && gl_VertexID < miniPEKKASize * 2) // tinkerbell
-    {
-       fractalColor = vec3(0.7f, 0.2f, 0.2f);
-       needColor = -1.f;
-    }
-    if(gl_VertexID > miniPEKKASize * 2) // gigachad
-    {
-        fractalColor = vec3(1.f, 1.f, 1.f);
-        needColor = 1.f;
-    }
+    vec3 p[] = vec3[]
+    (
+        vec3( 1.f,  1.f, 0.f),
+        vec3( 1.f, -1.f, 0.f),
+        vec3(-1.f, -1.f, 0.f),
+        vec3(-1.f,  1.f, 0.f)
+    );
+    int idx[] = int[]
+    (
+        0, 1, 3,
+        1, 2, 3
+    );
 
-    pos = aPos;
-    gl_Position = proj * R * vec4(aPos, 1.f);
+    gl_Position = vec4(p[idx[gl_VertexID]], 1.f); 
+
+    camPos     = uCamPos;
+    time       = uTime;
+    resolution = uResolution;
+    mouse      = uMouse;
+    ctgFOV     = ctgFOV;
+
+    uv         = 0.5f + 0.5f * gl_Position.xy;
 }
+
