@@ -142,7 +142,7 @@ vec3 rayDirection(float fov, vec2 size, vec2 fragCoord)
     vec2 xy = fragCoord - size / 2.0;
     float z = size.y / tan(radians(fov) / 2.0);
     
-    return normalize(vec3(xy, z));
+    return vec3(followMouse() * vec4(normalize(vec3(xy, z)), 1).xyz;
 }
 
 vec3 compNormal(vec3 samplePoint)
@@ -234,7 +234,7 @@ void main()
                 vec4(0.0, 0.1, 0.3, 0.7),
                 clamp(marchDist * 0.2, 0.0, 1.0)
             ),
-            1
+            0
         );
 	}
 }
